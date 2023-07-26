@@ -1,0 +1,45 @@
+filebeat:
+  autodiscover.providers:
+    - type: docker
+      templates:
+        - condition.contains:
+            docker.container.image: 2smart-nginx
+          config:
+            - module: nginx
+              access:
+                input:
+                  type: container
+                  paths:
+                    - "/usr/share/filebeat/dockerlogs/${data.docker.container.id}/*.log"
+                  max_bytes: 1048576
+
+        - condition.not.contains:
+            docker.container.image: 2smart-nginx
+          config:
+            - type: container
+              paths:
+                - "/usr/share/filebeat/dockerlogs/${data.docker.container.id}/*.log"
+              max_bytes: 1048576
+              exclude_lines: ['log/harvester.go']
+              multiline.pattern: '^{'
+              multiline.negate: true
+              multiline.match: after
+              multiline.timeout: 1s
+
+processors:
+  - add_docker_metadata: ~
+  - add_host_metadata: ~
+  - decode_json_fields:
+      fields: ["message", "level"]
+      target: "json"
+      overwrite_keys: true
+
+output.file:
+    path: '/usr/share/filebeat/2smart'
+    filename: 2smart-log
+    rotate_every_kb: 4060
+    number_of_files: 2
+    permissions: 0644
+
+logging.json: true
+logging.metrics.enabled: false
